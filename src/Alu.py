@@ -15,7 +15,7 @@ ALU can do the following operations:
     sll
     srl
 """
-from BinFuncs import sign_extend, bin_to_int
+from BinFuncs import sign_extend, bin_to_int_signed
 
 
 class ALU:
@@ -26,49 +26,49 @@ class ALU:
         """
         a + b
         """
-        return sign_extend(bin_to_int(a) + bin_to_int(b))
+        return sign_extend(bin_to_int_signed(a) + bin_to_int_signed(b))
 
     def sub(self, a: str, b: str) -> str:
         """
         a - b
         """
-        return sign_extend(bin_to_int(a) - bin_to_int(b))
+        return sign_extend(bin_to_int_signed(a) - bin_to_int_signed(b))
 
     def and_(self, a: str, b: str) -> str:
         """
         a & b
         """
-        return sign_extend(bin_to_int(a) & bin_to_int(b))
+        return sign_extend(bin_to_int_signed(a) & bin_to_int_signed(b))
 
     def or_(self, a: str, b: str) -> str:
         """
         a | b
         """
-        return sign_extend(bin_to_int(a) | bin_to_int(b))
+        return sign_extend(bin_to_int_signed(a) | bin_to_int_signed(b))
 
     def xor(self, a: str, b: str) -> str:
         """
         a ^ b
         """
-        return sign_extend(bin_to_int(a) ^ bin_to_int(b))
+        return sign_extend(bin_to_int_signed(a) ^ bin_to_int_signed(b))
 
     def nor(self, a: str, b: str) -> str:
         """
         ~(a | b)
         """
-        return sign_extend(~(bin_to_int(a) | bin_to_int(b)))
+        return sign_extend(~(bin_to_int_signed(a) | bin_to_int_signed(b)))
 
     def sll(self, a: str, n: int) -> str:
         """
         a << n
         """
-        return sign_extend(bin_to_int(a) << n)
+        return sign_extend(bin_to_int_signed(a) << n)
 
     def srl(self, a: str, n: int) -> str:
         """
         a >> n
         """
-        return sign_extend(bin_to_int(a) >> n)
+        return sign_extend(bin_to_int_signed(a) >> n)
 
 
 # * =========== test ===========

@@ -11,9 +11,13 @@ def sign_extend(val: int) -> str:
     return '0' * (32 - len(bin(val))) + 2*'0' + bin(val)[2:]
 
 
-def bin_to_int(val: str) -> int:
+def bin_to_int_signed(val: str) -> int:
     if val.startswith('1'):
         return -1 * (2**32 - int(val, 2))
+    return int(val, 2)
+
+
+def bin_to_int_unsigned(val: str) -> int:
     return int(val, 2)
 
 
