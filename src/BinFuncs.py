@@ -1,4 +1,7 @@
-# sign extend:
+"""
+Functions related to doing things with binary numbers
+"""
+
 def sign_extend(val: int) -> str:
     # if bigger than 32 bits, return least 32 bits
     if val >= 2**32:

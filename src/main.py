@@ -4,10 +4,9 @@ _summary_
 
 """
 
+
 def main() -> None:
     pc = '0' * 32
-    
-
 
 
 if __name__ == '__main__':

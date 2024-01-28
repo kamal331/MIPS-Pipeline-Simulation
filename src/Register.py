@@ -1,3 +1,8 @@
+"""
+Implement Register and Register File for MIPS
+"""
+
+
 class Reg:
     def __init__(self, name: str, val: int = 0) -> None:
         self.name = name
@@ -18,8 +23,8 @@ class RegFile:
     def __getitem__(self, key: str) -> Reg:
         if key.startswith('$'):
             return self.regs[int(key[1:])]
-        else:
-            return self.regs[int(key)]
+
+        return self.regs[int(key)]
 
     def __setitem__(self, key: str, val: int) -> None:
         if key.startswith('$'):
@@ -29,7 +34,6 @@ class RegFile:
 
     def __str__(self) -> str:
         return '\n'.join([f'{reg.name}: {reg.val}' for reg in self.regs])
-
 
 
 # * =========== test ===========
