@@ -13,9 +13,10 @@ class Block:
         self.tag = tag
         self.data = data
         self.state = 'invalid'
+        self.dirty = False
 
     def __str__(self) -> str:
-        return f'Block(tag={self.tag}, data={self.data}, state={self.state})'
+        return f'Block(tag={self.tag}, data={self.data}, state={self.state}, dirty={self.dirty})'
 
     def __repr__(self) -> str:
         return str(self)
@@ -122,6 +123,15 @@ if __name__ == '__main__':
     # check if the block is in cache
     if not if_in_cache(cache, address):
         add_to_cache(cache, address, '10101010101010101010101010101010')
+
+    address = '1'*23 + set_bits + '0'*5
+    if not if_in_cache(cache, address):
+        add_to_cache(cache, address, '10101010101010101010101010101011')
+
+    address = '0'*23 + set_bits + '1'*5
+    if not if_in_cache(cache, address):
+        # replace first one
+        add_to_cache(cache, address, '10101010101010101010101011111111')
     # print(cache)
-    print(cache[tag_bits + set_bits])
-    # print(cache)
+    # print(cache[tag_bits + set_bits])
+    print(cache)
