@@ -6,7 +6,7 @@ design memory for the MIPS simulator. Because memory is a large array, we use a 
 class Memory:
     def __init__(self, size: int) -> None:
         self.size = size
-        self.mem = [0] * size
+        self.mem = [0 for _ in range(size)]
 
     def __getitem__(self, key: int) -> int:
         return self.mem[key]

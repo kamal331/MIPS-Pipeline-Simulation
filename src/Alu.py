@@ -26,49 +26,49 @@ class ALU:
         """
         a + b
         """
-        return sign_extend(bin_to_int_signed(a) + bin_to_int_signed(b))
+        return sign_extend(bin_to_int_signed(a, 32) + bin_to_int_signed(b, 32), 32)
 
     def sub(self, a: str, b: str) -> str:
         """
         a - b
         """
-        return sign_extend(bin_to_int_signed(a) - bin_to_int_signed(b))
+        return sign_extend(bin_to_int_signed(a, 32) - bin_to_int_signed(b, 32), 32)
 
     def and_(self, a: str, b: str) -> str:
         """
         a & b
         """
-        return sign_extend(bin_to_int_signed(a) & bin_to_int_signed(b))
+        return sign_extend(bin_to_int_signed(a, 32) & bin_to_int_signed(b, 32), 32)
 
     def or_(self, a: str, b: str) -> str:
         """
         a | b
         """
-        return sign_extend(bin_to_int_signed(a) | bin_to_int_signed(b))
+        return sign_extend(bin_to_int_signed(a, 32) | bin_to_int_signed(b, 32), 32)
 
     def xor(self, a: str, b: str) -> str:
         """
         a ^ b
         """
-        return sign_extend(bin_to_int_signed(a) ^ bin_to_int_signed(b))
+        return sign_extend(bin_to_int_signed(a, 32) ^ bin_to_int_signed(b, 32), 32)
 
     def nor(self, a: str, b: str) -> str:
         """
         ~(a | b)
         """
-        return sign_extend(~(bin_to_int_signed(a) | bin_to_int_signed(b)))
+        return sign_extend(~(bin_to_int_signed(a, 32) | bin_to_int_signed(b, 32)), 32)
 
     def sll(self, a: str, n: int) -> str:
         """
         a << n
         """
-        return sign_extend(bin_to_int_signed(a) << n)
+        return sign_extend(bin_to_int_signed(a, 32) << n, 32)
 
     def srl(self, a: str, n: int) -> str:
         """
         a >> n
         """
-        return sign_extend(bin_to_int_signed(a) >> n)
+        return sign_extend(bin_to_int_signed(a, 32) >> n, 32)
 
 
 # * =========== test ===========

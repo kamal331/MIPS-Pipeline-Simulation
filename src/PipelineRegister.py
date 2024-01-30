@@ -37,6 +37,6 @@ if __name__ == '__main__':
         'IF/ID',
         {'PC': '0'*32,
          'IR': '0'*32,
-         'PCWRITE': True,
-         'IFIDWRITE': True})
+         'PCWRITE': 1,
+         'IFIDWRITE': 1})
     print(if_id)

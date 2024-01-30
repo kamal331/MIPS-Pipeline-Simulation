@@ -2,18 +2,19 @@
 Functions related to doing things with binary numbers
 """
 
-def sign_extend(val: int) -> str:
-    # if bigger than 32 bits, return least 32 bits
-    if val >= 2**32:
-        return bin(val)[-32:]
+
+def sign_extend(val: int, bits_no: int) -> str:
+    # ex: if bigger than 32 bits, return least 32 bits
+    if val >= 2**bits_no:
+        return bin(val)[-bits_no:]
     if val < 0:
-        return '1' * (32 - len(bin(val))) + 3*'1' + bin(val)[3:]
-    return '0' * (32 - len(bin(val))) + 2*'0' + bin(val)[2:]
+        return '1' * (bits_no - len(bin(val))) + 3*'1' + bin(val)[3:]
+    return '0' * (bits_no - len(bin(val))) + 2*'0' + bin(val)[2:]
 
 
-def bin_to_int_signed(val: str) -> int:
+def bin_to_int_signed(val: str, bits_no: int) -> int:
     if val.startswith('1'):
-        return -1 * (2**32 - int(val, 2))
+        return -1 * (2**bits_no - int(val, 2))
     return int(val, 2)
 
 

@@ -37,14 +37,15 @@ class RegFile:
 
 
 # * =========== test ===========
-regs: RegFile = RegFile()
-regs['$1'] = 1
-regs['$2'] = 2
-regs['$3'] = 3
+if __name__ == '__main__':
+    regs: RegFile = RegFile()
+    regs['$1'] = -1
+    regs['$2'] = 2
+    regs['$3'] = 3
 
-print(regs['$1'].str_val())
-print(regs['$2'].str_val())
-print(regs['$3'].str_val())
-print(regs['$4'].str_val())
+    print(regs['$1'].str_val())
+    print(regs['$2'].str_val())
+    print(regs['$3'].str_val())
+    print(regs['$4'].str_val())
 
-print(regs)
+    print(regs)
