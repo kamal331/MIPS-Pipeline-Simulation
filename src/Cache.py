@@ -13,10 +13,9 @@ class Block:
         self.tag = tag
         self.data = data
         self.state = 'invalid'
-        self.dirty = False
 
     def __str__(self) -> str:
-        return f'Block(tag={self.tag}, data={self.data}, state={self.state}, dirty={self.dirty})'
+        return f'Block(tag={self.tag}, data={self.data}, state={self.state})'
 
     def __repr__(self) -> str:
         return str(self)

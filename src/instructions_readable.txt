@@ -1,9 +1,6 @@
-addi $9 $0 0x1    // $9 = 1
-addi $8 $9 0x1    // $8 = $9 + 1 -> $8 = 2
-sw $8 0x0($0)     // mem[0] = $8 -> mem[0] = 2
-bne $9 $8 0x5     // if $9 != $8 goto 0x4 + PC
-addi $9 $0 0x1    // $9 = 1  -> SKIP
-add $8 $9 $8      // $8 = $9 + $8 -> $8 = 3
-addi $9 $0 0x1    // $9 = 1
-addi $9 $9 0x1    // $9 = $9 + 1 -> $9 = 2
-addi $9 $9 0x1    // $9 = $9 + 1 -> $9 = 3
+addi $9 $0 0x1    // $9 = 1  -> addi t1 $zero 0x1
+addi $8 $0 0x02   // $8 = 2  -> addi t0 $zero 0x2
+addi $14 $0 0x3   // $14 = 3  -> addi t6 $zero 0x3
+addi $15 $0 0x4   // $15 = 4  -> addi t7 $zero 0x4
+addi $15 $0 0x4   // $15 = 8  -> addi t7 $zero 0x4
+add $8 $8 $9      // $8 = 3 -> add t0 t0 t1
