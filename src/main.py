@@ -6,7 +6,7 @@ _summary_
 from termcolor import colored
 from Memory import Memory
 from Register import RegFile
-from Cache import Cache, if_in_cache, add_to_cache
+from Cache import cache, if_in_cache, add_to_cache, get_cache_data
 from Alu import ALU
 from BinFuncs import sign_extend, bin_to_int_signed, bin_to_int_unsigned
 from PipelineRegister import PipelineRegister
@@ -133,14 +133,12 @@ for i in range(32):
 
 
 alu = ALU()
-cache = Cache(1024, 32, 2)
+
 data_mem = Memory(1024)
 for i in range(1024):
-    data_mem[i] = i
+    data_mem[i] = sign_extend(i+1, 32)
 
-alu_inp1 = alu_inp2 = alu_out = 0
-zero_flag = 0
-pc = 0
+alu_inp1 = alu_inp2 = alu_out = zero_flag = pc = stall_count = 0
 
 
 def update_if_id() -> None:
@@ -177,7 +175,16 @@ def update_id_ex() -> None:
         opcode = bin_to_inst_dict[(id_ex['OPCODE'], id_ex['FUNCT'])]
     except KeyError:
         opcode = bin_to_inst_dict[(id_ex['OPCODE'], 'xxxxxx')]
-    if is_rtype(opcode):
+    if inst == '0' * 32 or opcode == 'break':
+        id_ex['REG_DST'] = '0'
+        id_ex['ALU_SRC'] = '00'
+        id_ex['MEM_TO_REG'] = '0'
+        id_ex['ALUT_OP'] = '00'
+        id_ex['MEM_READ'] = '0'
+        id_ex['MEM_WRITE'] = '0'
+        id_ex['BRANCH'] = '0'
+        id_ex['REG_WRITE'] = '0'
+    elif is_rtype(opcode):
         id_ex['REG_DST'] = '1'
         id_ex['ALU_SRC'] = '00'
         id_ex['MEM_TO_REG'] = '0'
@@ -321,7 +328,11 @@ def print_decoded_inst(if_id: PipelineRegister) -> None:
 
     text = colored('instruction decoded: ✅', 'yellow')
     print(text)
-    if is_rtype(opcode):
+    if if_id['IR'] == '0'*32:
+        print('nop')
+    elif opcode == 'break':
+        print('break')
+    elif is_rtype(opcode):
         print(opcode, bin_to_regname[if_id['RD']], bin_to_regname[if_id['RS']],
               bin_to_regname[if_id['RT']])
     elif is_itype(opcode):
@@ -359,7 +370,6 @@ def ex_rtype(inst: str, opcode: str) -> None:
     # alu_inp1 = reg_file[f'${bin_to_int_unsigned(inst[6:11])}'].val
     # alu_inp2 = reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val
     # print(f'alu_inp1 = {alu_inp1}')
-
     if opcode == 'add':
         alu_out = alu.add(alu_inp1, alu_inp2)
         print('add', bin_to_regname[inst[16:21]], bin_to_regname[inst[6:11]],
@@ -443,11 +453,11 @@ def ex_itype(inst: str, opcode: str) -> None:
     elif opcode == 'lw':
         alu_out = alu.add(alu_inp1, alu_inp2)
         print('lw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
-              '(', bin_to_regname[inst[6:11]], ')', '=', alu_out)
+              '(', bin_to_regname[inst[6:11]], ')', 'address =>', alu_out)
     elif opcode == 'sw':
         alu_out = alu.add(alu_inp1, alu_inp2)
         print('sw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
-              '(', bin_to_regname[inst[6:11]], ')', '=', alu_out)
+              '(', bin_to_regname[inst[6:11]], ')', 'address =>', alu_out)
 
 
 def execute():
@@ -471,7 +481,13 @@ def execute():
     except KeyError:
         opcode = bin_to_inst_dict[(id_ex['OPCODE'], 'xxxxxx')]
 
-    if is_rtype(opcode):
+    if inst == '0' * 32:
+        print('nop')
+
+    elif opcode == 'break':
+        print('break')
+
+    elif is_rtype(opcode):
         ex_rtype(inst, opcode)
     elif is_itype(opcode):
         ex_itype(inst, opcode)
@@ -485,7 +501,7 @@ def working_with_cache() -> None:
     # if instruction is lw, get data from cache or memory and add it to cache
     # if instruction is sw, write data to cache and set state to modified
     # if cache is full, use LRU to replace a block and before replacing, write back to memory if state is modified
-    global ex_mem
+    global ex_mem, cache
     inst = ex_mem['IR']
     try:
         opcode = bin_to_inst_dict[(ex_mem['OPCODE'], ex_mem['FUNCT'])]
@@ -495,23 +511,48 @@ def working_with_cache() -> None:
     if opcode == 'lw':
         # check if the block is in cache
         if not if_in_cache(cache, alu_out):
+            print('@'*15, '\n\n\n\n\n')
             # if not, add it to cache
-            add_to_cache(cache, alu_out, data_mem[alu_out])
-        # get data from cache
-        ex_mem['ALU_OUT'] = cache[alu_out].data
+            text = colored('cache miss ❌', 'red')
+            print(text)
+            text = colored('stall', 'red')
+            print((text+'\n')*10)
+            # no operation for 10 cycles (stall) -> update if_id and id_ex
+            print(alu_out)
+            try:
+                add_to_cache(alu_out,
+                             data_mem[bin_to_int_unsigned(alu_out)])
+                # print('data_mem[alu_out]: ',
+                #       data_mem[bin_to_int_unsigned(alu_out)])
+                # we have to get tag and number of set bits to cache to get value:
+                # tag_bits = alu_out[:cache.tag_size]
+                # set_bits = alu_out[cache.tag_size:cache.tag_size +
+                #                    cache.set_bits_size]
+
+                # print('cache[alu_out].data: ', cache[tag_bits + set_bits].data)
+
+                # print(cache)
+            except KeyError:
+                add_to_cache(alu_out, data_mem[alu_out])
+            except Exception:
+                raise Exception('alu_out < 0')
+        else:
+            text = colored('cache hit ✅', 'green')
+            print(text)
+        ex_mem['ALU_OUT'] = get_cache_data(cache, alu_out)
         print('lw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
-              '(', bin_to_regname[inst[6:11]], ')', '=', ex_mem['ALU_OUT'])
-    elif opcode == 'sw':
+              '(', bin_to_regname[inst[6:11]], ')', 'value: ', ex_mem['ALU_OUT'])
+    elif opcode == 'sw':  # ! Wrong!!!!!!!!!!!!!
         # check if the block is in cache
         if not if_in_cache(cache, alu_out):
             # if not, add it to cache
-            add_to_cache(cache, alu_out, data_mem[alu_out])
+            add_to_cache(alu_out, data_mem[alu_out])
         # write data to cache and set state to modified
         cache[alu_out].data = sign_extend(
             reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val, 32)
         cache[alu_out].state = 'modified'
         print('sw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
-              '(', bin_to_regname[inst[6:11]], ')', '=', cache[alu_out].data)
+              '(', bin_to_regname[inst[6:11]], ')', 'val: ', cache[alu_out].data)
     # elif opcode == 'addi':
     #     print('addi', bin_to_regname[inst[11:16]], bin_to_regname[inst[6:11]],
     #           bin_to_int_signed(inst[16:], 16), '=', ex_mem['ALU_OUT'])
@@ -539,37 +580,44 @@ def write_back() -> None:
         opcode = bin_to_inst_dict[(mem_wb['OPCODE'], mem_wb['FUNCT'])]
     except KeyError:
         opcode = bin_to_inst_dict[(mem_wb['OPCODE'], 'xxxxxx')]
-    text = colored('write_back_opcode:   ', 'red')
-    print(text, opcode)
+    text = colored('write_back_opcode:', 'yellow')
 
-    # if instruction is lw, write data to register
-    if mem_wb['MEM_TO_REG'] == '1':
-        reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val = mem_wb['ALU_OUT']
-        print('lw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
-              '(', bin_to_regname[inst[6:11]], ')', '=', mem_wb['ALU_OUT'])
-    elif mem_wb['REG_WRITE'] == '1':
-        if is_itype(opcode):
+    if inst == '0' * 32:
+        print(text, 'nop')
+    elif opcode == 'break':
+        print(text, 'break')
+
+    else:
+        print(text, opcode)
+
+        # if instruction is lw, write data to register
+        if mem_wb['MEM_TO_REG'] == '1':
             reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val = mem_wb['ALU_OUT']
-            print('reg file updated ✅:',
-                  bin_to_regname[inst[11:16]], '=', mem_wb['ALU_OUT'])
-        if is_rtype(opcode):
-            reg_file[f'${bin_to_int_unsigned(inst[16:21])}'].val = mem_wb['ALU_OUT']
-            print('reg file updated ✅:',
-                  bin_to_regname[inst[16:21]], '=', mem_wb['ALU_OUT'])
-        # elif is_rtype(opcode): TODO: voice1
-        #     print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&')
-        #     reg_file[bin_to_int_unsigned(inst[16:21])].val = mem_wb['ALU_OUT']
-        #     print(opcode, bin_to_regname[inst[16:21]], bin_to_regname[inst[6:11]],
-        #           bin_to_regname[inst[11:16]], '=', mem_wb['ALU_OUT'])
-    elif mem_wb['MEM_READ'] == '1':
-        print('lw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
-              '(', bin_to_regname[inst[6:11]], ')', '=', mem_wb['ALU_OUT'])
-    elif opcode == 'jr':
-        print('jr', bin_to_regname[inst[6:11]])
-    elif opcode == 'jal':
-        print('jal', bin_to_regname[inst[6:11]])
-    elif opcode == 'j':
-        print('j', bin_to_regname[inst[6:11]])
+            print('lw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
+                  '(', bin_to_regname[inst[6:11]], ')', '=', mem_wb['ALU_OUT'])
+        elif mem_wb['REG_WRITE'] == '1':
+            if is_itype(opcode):
+                reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val = mem_wb['ALU_OUT']
+                print('reg file updated ✅:',
+                      bin_to_regname[inst[11:16]], '=', mem_wb['ALU_OUT'])
+            if is_rtype(opcode):
+                reg_file[f'${bin_to_int_unsigned(inst[16:21])}'].val = mem_wb['ALU_OUT']
+                print('reg file updated ✅:',
+                      bin_to_regname[inst[16:21]], '=', mem_wb['ALU_OUT'])
+            # elif is_rtype(opcode): TODO: voice1
+            #     print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&')
+            #     reg_file[bin_to_int_unsigned(inst[16:21])].val = mem_wb['ALU_OUT']
+            #     print(opcode, bin_to_regname[inst[16:21]], bin_to_regname[inst[6:11]],
+            #           bin_to_regname[inst[11:16]], '=', mem_wb['ALU_OUT'])
+        elif mem_wb['MEM_READ'] == '1':
+            print('lw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
+                  '(', bin_to_regname[inst[6:11]], ')', '=', mem_wb['ALU_OUT'])
+        elif opcode == 'jr':
+            print('jr', bin_to_regname[inst[6:11]])
+        elif opcode == 'jal':
+            print('jal', bin_to_regname[inst[6:11]])
+        elif opcode == 'j':
+            print('j', bin_to_regname[inst[6:11]])
 
 
 # *********************** main ***********************
@@ -584,12 +632,13 @@ def main() -> None:
 
     pc_write = if_id_write = True
 
-    inst_count = 6
+    inst_count = 8
     pipeline_stage_no = 5
     total_pipeline_clocks = inst_count + pipeline_stage_no - 1  # ! except for hazards
     cycle_seperator = colored('==================', 'magenta')
     stage_seperator = colored('------------------', 'green')
-    while total_pipeline_clocks > 0:
+    k = 0
+    while k < total_pipeline_clocks:
         # first fetch instruction from memory (from file)
         # pipeline fetch, decode, execute memory, write back
         if pc_write and if_id_write:
@@ -613,8 +662,10 @@ def main() -> None:
         update_ex_mem()  # get from id_ex
         update_id_ex()  # get from if_id
         update_if_id()  # get from pc
-        total_pipeline_clocks -= 1
+        k += 1
         pc += 1
+    print('throughput:', inst_count / (total_pipeline_clocks))
+    print(reg_file)
 
 
 if __name__ == '__main__':

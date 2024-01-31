@@ -81,6 +81,9 @@ class Cache:
         return self.size
 
 
+cache: Cache = Cache(1024, 32, 2)
+
+
 def if_in_cache(cache: Cache, address: str) -> bool:
     tag_size = cache.tag_size
     set_bit_size = cache.set_bits_size
@@ -88,12 +91,13 @@ def if_in_cache(cache: Cache, address: str) -> bool:
     set_bits = address[tag_size:tag_size+set_bit_size]
     # offset_bits = address[tag_size+set_bit_size:]
     # check if the block is in cache
-    if cache[tag_bits + set_bits]:
+    if cache[tag_bits + set_bits] and cache[tag_bits + set_bits].state != 'invalid':
         return True
     return False
 
 
-def add_to_cache(cache: Cache, address: str, data: str) -> None:
+def add_to_cache(address: str, data: str) -> None:
+    global cache
     tag_size = cache.tag_size
     set_bit_size = cache.set_bits_size
     tag_bits = address[:tag_size]
@@ -105,9 +109,20 @@ def add_to_cache(cache: Cache, address: str, data: str) -> None:
     cache[tag_bits + set_bits] = block
 
 
+def get_cache_data(cache: Cache, address: str) -> str:
+    tag_size = cache.tag_size
+    set_bit_size = cache.set_bits_size
+    tag_bits = address[:tag_size]
+    set_bits = address[tag_size:tag_size+set_bit_size]
+    # offset_bits = address[tag_size+set_bit_size:]
+    # check if the block is in cache
+    if cache[tag_bits + set_bits] and cache[tag_bits + set_bits].state != 'invalid':
+        return cache[tag_bits + set_bits][:]
+    return '0'*cache.block_size
+
+
 # * =========== test ===========
 if __name__ == '__main__':
-    cache: Cache = Cache(1024, 32, 2)
     # print(cache.tag_size)
     # print(cache)
 
@@ -121,16 +136,16 @@ if __name__ == '__main__':
     print(tag_bits, set_bits, offset_bits)
     # check if the block is in cache
     if not if_in_cache(cache, address):
-        add_to_cache(cache, address, '10101010101010101010101010101010')
+        add_to_cache(address, '10101010101010101010101010101010')
 
     address = '1'*23 + set_bits + '0'*5
     if not if_in_cache(cache, address):
-        add_to_cache(cache, address, '10101010101010101010101010101011')
+        add_to_cache(address, '10101010101010101010101010101011')
 
     address = '0'*23 + set_bits + '1'*5
     if not if_in_cache(cache, address):
         # replace first one
-        add_to_cache(cache, address, '10101010101010101010101011111111')
+        add_to_cache(address, '10101010101010101010101011111111')
     # print(cache)
     # print(cache[tag_bits + set_bits])
-    print(cache)
+    print(cache[address[:tag_size] + set_bits])
