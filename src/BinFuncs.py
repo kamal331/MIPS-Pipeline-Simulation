@@ -20,9 +20,3 @@ def bin_to_int_signed(val: str, bits_no: int) -> int:
 
 def bin_to_int_unsigned(val: str) -> int:
     return int(val, 2)
-
-
-# * =========== test ===========
-# print(sign_extend(2**32+1))  # overflow
-
-# print(bin_to_int(sign_extend(2)))
