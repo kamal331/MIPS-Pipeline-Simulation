@@ -23,49 +23,57 @@ class ALU:
     Arithmetic Logic Unit (ALU) for MIPS
     """
 
-    def add(self, a: str, b: str) -> str:
+    @staticmethod
+    def add(a: str, b: str) -> str:
         """
         a + b
         """
         return sign_extend(bin_to_int_signed(a, 32) + bin_to_int_signed(b, 32), 32)
 
-    def sub(self, a: str, b: str) -> str:
+    @staticmethod
+    def sub(a: str, b: str) -> str:
         """
         a - b
         """
         return sign_extend(bin_to_int_signed(a, 32) - bin_to_int_signed(b, 32), 32)
 
-    def and_(self, a: str, b: str) -> str:
+    @staticmethod
+    def and_(a: str, b: str) -> str:
         """
         a & b
         """
         return sign_extend(bin_to_int_signed(a, 32) & bin_to_int_signed(b, 32), 32)
 
-    def or_(self, a: str, b: str) -> str:
+    @staticmethod
+    def or_(a: str, b: str) -> str:
         """
         a | b
         """
         return sign_extend(bin_to_int_signed(a, 32) | bin_to_int_signed(b, 32), 32)
 
-    def xor(self, a: str, b: str) -> str:
+    @staticmethod
+    def xor(a: str, b: str) -> str:
         """
         a ^ b
         """
         return sign_extend(bin_to_int_signed(a, 32) ^ bin_to_int_signed(b, 32), 32)
 
-    def nor(self, a: str, b: str) -> str:
+    @staticmethod
+    def nor(a: str, b: str) -> str:
         """
         ~(a | b)
         """
         return sign_extend(~(bin_to_int_signed(a, 32) | bin_to_int_signed(b, 32)), 32)
 
-    def sll(self, a: str, n: int) -> str:
+    @staticmethod
+    def sll(a: str, n: int) -> str:
         """
         a << n
         """
         return sign_extend(bin_to_int_signed(a, 32) << n, 32)
 
-    def srl(self, a: str, n: int) -> str:
+    @staticmethod
+    def srl(a: str, n: int) -> str:
         """
         a >> n
         """
