@@ -1,6 +1,10 @@
 """
-design memory for the MIPS simulator. Because memory is a large array, we use a class to represent it.
+design memory for the MIPS simulator. Because memory 
+is a large array, we use a class to represent it.
 """
+
+
+from typing import Iterator
 
 
 class Memory:
@@ -8,10 +12,10 @@ class Memory:
         self.size = size
         self.mem = ['0'*32 for _ in range(size)]
 
-    def __getitem__(self, key: int) -> int:
+    def __getitem__(self, key: int) -> str:
         return self.mem[key]
 
-    def __setitem__(self, key: int, val: int) -> None:
+    def __setitem__(self, key: int, val: str) -> None:
         self.mem[key] = val
 
     def __str__(self) -> str:
@@ -20,14 +24,14 @@ class Memory:
     def __len__(self) -> int:
         return self.size
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self.mem)
 
-    def __next__(self) -> int:
+    def __next__(self) -> str:
         try:
-            return next(self.mem)
-        except StopIteration:
-            raise StopIteration
+            return next(iter(self.mem))
+        except StopIteration as e:
+            raise StopIteration from e
 
 
 # * =========== test ===========
@@ -37,4 +41,3 @@ class Memory:
 # mem[2] = 3
 
 # print(mem)
-

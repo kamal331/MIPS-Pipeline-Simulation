@@ -19,8 +19,9 @@ from BinFuncs import sign_extend, bin_to_int_signed
 
 
 class ALU:
-    def __init__(self) -> None:
-        pass
+    """
+    Arithmetic Logic Unit (ALU) for MIPS
+    """
 
     def add(self, a: str, b: str) -> str:
         """
