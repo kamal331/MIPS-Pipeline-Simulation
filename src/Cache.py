@@ -1,174 +1,197 @@
 from Memory import Memory
 from BinFuncs import sign_extend, bin_to_int_unsigned
 """
-level one 2-way set-associative MSI cache
+level one 2-way set-associative MSI cache with write-back policy and write-allocate policy
 each block have one of the following states:
     invalid
-    shared
+    shared  -> valid, not modified
     modified
 """
 
 
 class Block:
-    def __init__(self, tag: str, data: str) -> None:
+    def __init__(self, tag: str, data: str, state: str = 'invalid') -> None:
         self.tag = tag
         self.data = data
-        self.state = 'invalid'
+        self.state = state
 
     def __str__(self) -> str:
-        return f'Block(tag={self.tag}, data={self.data}, state={self.state})'
+        return f'tag: {self.tag}, data: {self.data}, state: {self.state}'
 
     def __repr__(self) -> str:
-        return str(self)
-
-    def __eq__(self, o: object) -> bool:
-        if isinstance(o, Block):
-            return self.tag == o.tag
-        return False
-
-    def __hash__(self) -> int:
-        return hash(self.tag)
-
-    def __len__(self) -> int:
-        return len(self.data)
-
-    def __getitem__(self, key: int) -> str:
-        return self.data[key]
+        return self.__str__()
 
 
 class Cache:
-    def __init__(self, size: int, block_size: int, num_ways: int) -> None:
-        self.size = size
-        self.block_size = block_size
-        self.num_blocks = size // block_size
-        self.num_ways = num_ways
-        self.num_sets = self.num_blocks // self.num_ways
+    """
+    n-way set-associative cache with write-allocation and write-back policy
+    """
 
-        self.tag_size = 32 - (self.num_sets).bit_length() - \
-            (block_size).bit_length() + 2
-        self.set_bits_size = (self.num_sets).bit_length() - 1
+    def __init__(self, mem: Memory, cache_size: int,
+                 line_of_data_size: int, associativity: int) -> None:
+        self.mem = mem
+        self.cache_size = cache_size
+        self.line_of_data_size = line_of_data_size
+        self.associativity = associativity
+        self.blocks_no = cache_size // line_of_data_size
+        self.sets_no = self.blocks_no // associativity
+        # 0 means we have to replace the way 0 and 1 means we have to replace the way 1
+        self.lru = [0] * self.sets_no
+        self.logic_set_bits_no = self.sets_no.bit_length()-1
+        self.block_offset_bits_no = (line_of_data_size // 4).bit_length()-1
+        self.tag_bits_no = 32 - self.logic_set_bits_no - self.block_offset_bits_no
+        self.blocks_in_line = line_of_data_size // 4  # 4 bytes per word
+        self.blocks = [
+            [[Block('0'*self.tag_bits_no, '0'*32) for i in range(self.blocks_in_line)]
+             for j in range(associativity)] for _ in range(self.sets_no)
+        ]
 
-        self.blocks = [[Block('0'*self.tag_size, '1'*block_size)
-                        for _ in range(num_ways)] for _ in range(self.num_sets)]
+    def __setitem__(self, address: str, val: str, from_where: str = 'cpu') -> None:
+        """
+        if the block we want to write to is modified, first write the value in the block to memory (for all blocks in the line if the block is modified)
+        then write the value we want to cache
+        after insuring that the modified block is written to memory, write the value to the block
+        if from_where is 'mem', then we will bring a line from memory to cache (it means that for all blocks_in_line we will bring the corresponding data from memory to cache) and state will be 'shared'
+        if from_where is 'cpu', then we will write that block to cache and state will be 'modified'
+        """
+        tag = address[:self.tag_bits_no]
+        logic_set = address[self.tag_bits_no:self.tag_bits_no +
+                            self.logic_set_bits_no]
+        block_offset = address[self.tag_bits_no+self.logic_set_bits_no:]
+        block_offset = int(block_offset, 2)
+        logic_set = int(logic_set, 2)
+        lru = self.lru[logic_set]
+        if from_where == 'mem':
+            # first based on lru, decide which way to replace:
+            if self.blocks[logic_set][lru][0].state == 'modified':
+                for i in range(self.blocks_in_line):
+                    self.mem[bin_to_int_unsigned(self.blocks[logic_set][lru][i].tag + f'{logic_set:0{self.logic_set_bits_no}b}' +
+                                                 f'{i:0{self.block_offset_bits_no}b}')] = self.blocks[logic_set][lru][i].data
+            for i in range(self.blocks_in_line):
+                self.blocks[logic_set][lru][i].data = self.mem[bin_to_int_unsigned(
+                    address[:self.tag_bits_no] + f'{logic_set:0{self.logic_set_bits_no}b}' + f'{i:0{self.block_offset_bits_no}b}')]
+                self.blocks[logic_set][lru][i].tag = tag
+                self.blocks[logic_set][lru][i].state = 'shared'
+            self.lru[logic_set] = 1 - self.lru[logic_set]
+            # first we have to write the modified blocks to memory:
+            # for i in range(self.blocks_in_line):
+            #     if self.blocks[logic_set][0][i].state == 'modified':
+            #         self.mem[bin_to_int_unsigned(self.blocks[logic_set][0][i].tag + f'{logic_set:0{self.logic_set_bits_no}b}' +
+            #                  f'{i:0{self.block_offset_bits_no}b}')] = self.blocks[logic_set][0][i].data
+            # for i in range(self.blocks_in_line):
+            #     self.blocks[logic_set][0][i].data = self.mem[bin_to_int_unsigned(
+            #         address[:self.tag_bits_no] + f'{logic_set:0{self.logic_set_bits_no}b}' + f'{i:0{self.block_offset_bits_no}b}')]
 
-        self.lru = [0 for _ in range(self.num_sets)]
+            # self.blocks[logic_set][0][i].tag = tag
+            # self.blocks[logic_set][0][i].state = 'shared'
 
-    def __getitem__(self, key: str) -> Block | None:
-        set_idx = bin_to_int_unsigned(key[self.tag_size:])
-        tag = key[:self.tag_size]
-        for i in range(self.num_ways):
-            if self.blocks[set_idx][i].tag == tag:
-                return self.blocks[set_idx][i]
-        return None
+        else:
 
-    def __setitem__(self, key: str, val: Block) -> None:
-        set_idx = bin_to_int_unsigned(key[self.tag_size:])
-        tag = key[:self.tag_size]
-        for i in range(self.num_ways):
-            if self.blocks[set_idx][i].tag == tag:
-                self.blocks[set_idx][i] = val
-                return
-        # if not in cache, add it to cache
-        self.blocks[set_idx][self.lru[set_idx]] = val
-        self.lru[set_idx] = (self.lru[set_idx] + 1) % self.num_ways
+            # for i in range(self.associativity):
+            #     if self.blocks[logic_set][i][block_offset].state == 'modified':
+            #         self.mem[self.blocks[logic_set][i][block_offset].tag + f'{logic_set:0{self.logic_set_bits_no}b}' +
+            #                  f'{block_offset:0{self.block_offset_bits_no}b}'] = self.blocks[logic_set][i][block_offset].data
+            self.blocks[logic_set][self.lru[logic_set]
+                                   ][block_offset].data = val
+            self.blocks[logic_set][self.lru[logic_set]][block_offset].tag = tag
+            self.blocks[logic_set][self.lru[logic_set]
+                                   ][block_offset].state = 'modified'
+            self.lru[logic_set] = 1 - self.lru[logic_set]
 
+    def __getitem__(self, address: str) -> str:
+        """
+        if the block we want to read from is invalid, then we will bring the block from memory to cache and state will be 'shared'
+        if the block we want to read from is shared or modified, then we will read the value from the block
+        """
+        tag = address[:self.tag_bits_no]
+        logic_set = address[self.tag_bits_no:self.tag_bits_no +
+                            self.logic_set_bits_no]
+        block_offset = address[self.tag_bits_no+self.logic_set_bits_no:]
+        block_offset = int(block_offset, 2)
+        logic_set = int(logic_set, 2)
+        for i in range(self.associativity):
+            if self.blocks[logic_set][i][block_offset].tag == tag:
+                cond1 = self.blocks[logic_set][i][block_offset].state == 'shared'
+                cond2 = self.blocks[logic_set][i][block_offset].state == 'modified'
+                if cond1 or cond2:  # reduced the complexity of the code :)
+                    print('Cache hit ✅')
+                    print(
+                        f'hit, tag: {tag}, logic_set: {logic_set}, block_offset: {block_offset}')
+                    return self.blocks[logic_set][i][block_offset].data
+        # if we are here, then the block is not in the cache and we have to bring it from memory
+        print('Cache miss ❌')
+        self.__setitem__(
+            address, self.mem[bin_to_int_unsigned(address)], 'mem')
+        return self.mem[bin_to_int_unsigned(address)]
+
+    # for printing the cache
     def __str__(self) -> str:
-        return '\n'.join([f'{i}: {self.blocks[i]}' for i in range(self.num_sets)])
-
-    def __repr__(self) -> str:
-        return str(self)
-
-    def __len__(self) -> int:
-        return self.size
-
-
-cache: Cache = Cache(1024, 32, 2)
-inst_mem = Memory(1024)
-data_mem = Memory(1024)
+        res = ''
+        for i in range(self.sets_no):
+            res += f'set {i}:\n'
+            for j in range(self.associativity):
+                res += f'way {j}:\n'
+                for k in range(self.blocks_in_line):
+                    res += f'{self.blocks[i][j][k]}\n'
+        return res
 
 
-def if_in_cache(cache: Cache, address: str) -> bool:
-    tag_size = cache.tag_size
-    set_bit_size = cache.set_bits_size
-    tag_bits = address[:tag_size]
-    set_bits = address[tag_size:tag_size+set_bit_size]
-    # offset_bits = address[tag_size+set_bit_size:]
-    # check if the block is in cache
-    if cache[tag_bits + set_bits].state != 'invalid':
-        return True
-    return False
+def get_state_of_block(cache: Cache, address: str) -> str:
+    tag = address[:cache.tag_bits_no]
+    logic_set = address[cache.tag_bits_no:cache.tag_bits_no +
+                        cache.logic_set_bits_no]
+    block_offset = address[cache.tag_bits_no+cache.logic_set_bits_no:]
+    block_offset = int(block_offset, 2)
+    logic_set = int(logic_set, 2)
+    for i in range(cache.associativity):
+        if cache.blocks[logic_set][i][block_offset].tag == tag:
+            return cache.blocks[logic_set][i][block_offset].state
+    return 'invalid'
 
 
-def add_to_cache(address: str, data: str, from_where: str) -> None:
-    """
-    add data of an address to the cache.
-    if from_where == 'mem': state = shared
-    else: # from register:
-        if cache[tag_bits + set_bits].state == 'modified': write back to memory first and then add the new data to cache
-        else: add the new data to cache
-
-    """
-    global cache
-    tag_size = cache.tag_size
-    set_bit_size = cache.set_bits_size
-    tag_bits = address[:tag_size]
-    set_bits = address[tag_size:tag_size+set_bit_size]
-    offset_bits = address[tag_size+set_bit_size:]
-    # check if the block is in cache
-    if if_in_cache(cache, address):
-        if cache[tag_bits + set_bits].state == 'modified':
-            # write back to memory
-            # mem_address = cache[tag_bits + set_bits].tag + set_bits + '0'*5
-            data_mem[address] = cache[tag_bits + set_bits].data
-            print(
-                f'write back to memory: {address} -> {cache[tag_bits + set_bits].data}')
-        # add the new data to cache
-        cache[tag_bits + set_bits] = Block(tag_bits, data)
-        cache[tag_bits + set_bits].state = 'shared' if from_where == 'mem' else 'modified'
-    else:
-        # add the new data to cache
-        cache[tag_bits + set_bits] = Block(tag_bits, data)
-        cache[tag_bits + set_bits].state = 'shared' if from_where == 'mem' else 'modified'
-
-
-def get_cache_data(cache: Cache, address: str) -> tuple[str, str]:
-    tag_size = cache.tag_size
-    set_bit_size = cache.set_bits_size
-    tag_bits = address[:tag_size]
-    set_bits = address[tag_size:tag_size+set_bit_size]
-    # offset_bits = address[tag_size+set_bit_size:]
-    # check if the block is in cache
-    # cache[tag_bits + set_bits] and cache[tag_bits + set_bits].state != 'invalid'
-    if if_in_cache(cache, address):
-        return cache[tag_bits + set_bits][:], cache[tag_bits + set_bits].state
-    return '0'*cache.block_size, 'invalid'
+data_mem: Memory = Memory(4096)
+for i in range(4096):
+    data_mem[i] = sign_extend(i, 32)
+data_cache: Cache = Cache(data_mem, 256, 32, 2)
+inst_mem: Memory = Memory(4096)
 
 
 # * =========== test ===========
 if __name__ == '__main__':
-    # print(cache.tag_size)
-    # print(cache)
 
-    # check if a value is in cache or not, if not, add it to cache
-    address = '01' * 16
-    tag_size = 23
-    set_bit_size = 4
-    tag_bits = address[:tag_size]
-    set_bits = address[tag_size:tag_size+set_bit_size]
-    offset_bits = address[tag_size+set_bit_size:]
-    print(tag_bits, set_bits, offset_bits)
-    # check if the block is in cache
-    if not if_in_cache(cache, address):
-        add_to_cache(address, '10101010101010101010101010101010')
+    print(data_mem[5])
+    print(data_mem[128])
 
-    address = '1'*23 + set_bits + '0'*5
-    if not if_in_cache(cache, address):
-        add_to_cache(address, '10101010101010101010101010101011')
+    address = '0' * 25 + '0' * 4 + '0' * 3
+    print(f'address: {bin_to_int_unsigned(address)}')
+    # first time, it will be a cache miss
+    print(f'value: {data_cache[address]}')
+    print(get_state_of_block(data_cache, address))
 
-    address = '0'*23 + set_bits + '1'*5
-    if not if_in_cache(cache, address):
-        # replace first one
-        add_to_cache(address, '10101010101010101010101011111111')
-    # print(cache)
-    # print(cache[tag_bits + set_bits])
-    print(cache[address[:tag_size] + set_bits])
+    print('=======================')
+
+    address = '0' * 25 + '0' * 4 + '101'
+    print(f'address: {bin_to_int_unsigned(address)}')
+    # second time for same tag and logic_set, it will be a cache hit
+    print(f'value: {data_cache[address]}')
+
+    print('=======================')
+
+    # different tag -> different way in the same set -> cache miss
+    address = '0' * 24 + '1' + '0' * 4 + '000'
+    print(f'address: {bin_to_int_unsigned(address)}')
+    print(f'value: {data_cache[address]}')  # miss
+    print('=======================')
+    print(f'value: {data_cache[address]}')  # hit
+    # get state of the block
+    print(get_state_of_block(data_cache, address))
+
+    print('=======================')
+
+    # simulate cpu writes:
+    data_cache['0'*25 + '1'*4 + '000'] = '1'*32
+    print('value: ', data_cache['0'*25 + '1'*4 + '000'])
+    print(get_state_of_block(data_cache, '0'*25 + '1'*4 + '000'))
+
+    # address = '0' * 24 + '1' + '0' * 4 + '1' * 3
+    # print(f'value: {cache[address]}')

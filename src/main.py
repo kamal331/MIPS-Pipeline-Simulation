@@ -5,7 +5,7 @@ _summary_
 """
 from termcolor import colored
 from Register import RegFile
-from Cache import cache, inst_mem, data_mem, if_in_cache, add_to_cache, get_cache_data
+from Cache import data_cache, inst_mem, data_mem, get_state_of_block
 from Alu import ALU
 from BinFuncs import sign_extend, bin_to_int_signed, bin_to_int_unsigned
 from PipelineRegister import PipelineRegister
@@ -132,8 +132,8 @@ for i in range(32):
 
 alu = ALU()
 
-for i in range(1024):
-    data_mem[i] = sign_extend(i+1, 32)
+# for i in range(1024):
+#     data_mem[i] = sign_extend(i+1, 32)
 
 alu_inp1 = alu_inp2 = alu_out = zero_flag = pc = stall_count = 0
 
@@ -511,45 +511,57 @@ def working_with_cache() -> None:
         opcode = bin_to_inst_dict[(ex_mem['OPCODE'], 'xxxxxx')]
 
     if opcode == 'lw':
-        # check if the block is in cache
-        if not if_in_cache(cache, alu_out):
-            print('@'*15, '\n\n\n\n\n')
-            # if not, add it to cache
-            text = colored('cache miss ❌', 'red')
-            print(text)
-            text = colored('stall', 'red')
-            print((text+'\n')*10)
-            # no operation for 10 cycles (stall) -> update if_id and id_ex
-            print('address:', alu_out)
-            try:
-                add_to_cache(alu_out,
-                             data_mem[bin_to_int_unsigned(alu_out)], 'mem')
-                # print('data_mem[alu_out]: ',
-                #       data_mem[bin_to_int_unsigned(alu_out)])
-                # we have to get tag and number of set bits to cache to get value:
-                # tag_bits = alu_out[:cache.tag_size]
-                # set_bits = alu_out[cache.tag_size:cache.tag_size +
-                #                    cache.set_bits_size]
-
-                # print('cache[alu_out].data: ', cache[tag_bits + set_bits].data)
-
-                # print(cache)
-            except KeyError:
-                add_to_cache(alu_out, data_mem[alu_out], 'mem')
-            except Exception:
-                raise Exception('alu_out < 0')
-        else:
-            text = colored('cache hit ✅', 'green')
-            print(text)
-        ex_mem['ALU_OUT'], state = get_cache_data(cache, alu_out)
+        ex_mem['ALU_OUT'] = data_cache[alu_out]
+        # state = get_state_of_block(data_cache, alu_out)
         print('lw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
-              '(', bin_to_regname[inst[6:11]], ')', 'value: ', ex_mem['ALU_OUT'], state)
+              '(', bin_to_regname[inst[6:11]], ')', 'value: ', ex_mem['ALU_OUT'])
+
+        # check if the block is in cache
+        # if not if_in_cache(cache, alu_out):
+        #     print('@'*15, '\n\n\n\n\n')
+        #     # if not, add it to cache
+        #     text = colored('cache miss ❌', 'red')
+        #     print(text)
+        #     text = colored('stall', 'red')
+        #     print((text+'\n')*10)
+        #     # no operation for 10 cycles (stall) -> update if_id and id_ex
+        #     print('address:', alu_out)
+        #     try:
+        #         add_to_cache(alu_out,
+        #                      data_mem[bin_to_int_unsigned(alu_out)], 'mem')
+        #         # print('data_mem[alu_out]: ',
+        #         #       data_mem[bin_to_int_unsigned(alu_out)])
+        #         # we have to get tag and number of set bits to cache to get value:
+        #         # tag_bits = alu_out[:cache.tag_size]
+        #         # set_bits = alu_out[cache.tag_size:cache.tag_size +
+        #         #                    cache.set_bits_size]
+
+        #         # print('cache[alu_out].data: ', cache[tag_bits + set_bits].data)
+
+        #         # print(cache)
+        #     except KeyError:
+        #         add_to_cache(alu_out, data_mem[alu_out], 'mem')
+        #     except Exception:
+        #         raise Exception('alu_out < 0')
+        # else:
+        #     text = colored('cache hit ✅', 'green')
+        #     print(text)
+        # ex_mem['ALU_OUT'], state = get_cache_data(cache, alu_out)
+        # print('lw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
+        #       '(', bin_to_regname[inst[6:11]], ')', 'value: ', ex_mem['ALU_OUT'], state)
     elif opcode == 'sw':
+        data_cache[alu_out] = sign_extend(
+            reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val, 32)
+        # state = get_state_of_block(data_cache, alu_out)
+        ex_mem['ALU_OUT'] = sign_extend(
+            reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val, 32)
+        print('sw:', '\nin location:', bin_to_int_signed(inst[16:], 16), ', value:',
+              reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val, 'must be saved')
         # write data to cache and set state to modified
-        add_to_cache(alu_out, sign_extend(
-            reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val, 32), 'modified')
-        print('sw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
-              '(', bin_to_regname[inst[6:11]], ')', 'value: ', reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val)
+        # add_to_cache(alu_out, sign_extend(
+        #     reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val, 32), 'modified')
+        # print('sw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
+        #       '(', bin_to_regname[inst[6:11]], ')', 'value: ', reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val)
 
     # elif opcode == 'addi':
     #     print('addi', bin_to_regname[inst[11:16]], bin_to_regname[inst[6:11]],
@@ -624,7 +636,6 @@ def write_back() -> None:
 # *********************** main ***********************
 
 def main() -> None:
-    print(cache)
     global pc
     with open('instructions.txt', 'r') as f:  # TODO: try excpet
         i = 0
@@ -634,7 +645,7 @@ def main() -> None:
 
     pc_write = if_id_write = True
 
-    inst_count = 8
+    inst_count = 9
     pipeline_stage_no = 5
     total_pipeline_clocks = inst_count + pipeline_stage_no - 1  # ! except for hazards
     cycle_seperator = colored('==================', 'magenta')
@@ -658,6 +669,7 @@ def main() -> None:
             print(stage_seperator)
 
             write_back()
+            print('\n', data_cache, '\n')
 
         print('\n\t', cycle_seperator, '\n')
         update_mem_wb()
