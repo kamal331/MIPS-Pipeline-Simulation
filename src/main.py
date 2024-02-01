@@ -319,7 +319,7 @@ def is_branch(name: str) -> bool:
     return name in ['beq', 'bne']
 
 
-def print_decoded_inst(if_id: PipelineRegister) -> None:
+def print_decoded_inst() -> None:
     # get instruction from if_id
     try:
         opcode = bin_to_inst_dict[(if_id['OPCODE'], if_id['FUNCT'])]
@@ -347,7 +347,7 @@ def decode():
     # get instruction from if_id
 
     # print instruction type:
-    print_decoded_inst(if_id)
+    print_decoded_inst()
 
 
 # -----------
@@ -367,9 +367,6 @@ def ex_rtype(inst: str, opcode: str) -> None:
         alu_inp1 = reg_file[f'${bin_to_int_unsigned(inst[6:11])}'].val
         alu_inp2 = reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val
 
-    # alu_inp1 = reg_file[f'${bin_to_int_unsigned(inst[6:11])}'].val
-    # alu_inp2 = reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val
-    # print(f'alu_inp1 = {alu_inp1}')
     rd = bin_to_regname[inst[16:21]]
     rs = bin_to_regname[inst[6:11]]
     rt = bin_to_regname[inst[11:16]]
@@ -474,7 +471,7 @@ def execute() -> None:
 
 def working_with_cache() -> None:
 
-    global ex_mem, cache
+    global ex_mem
     inst = ex_mem['IR']
     try:
         opcode = bin_to_inst_dict[(ex_mem['OPCODE'], ex_mem['FUNCT'])]
@@ -540,7 +537,6 @@ def working_with_cache() -> None:
 
 
 def write_back() -> None:
-    global mem_wb
     inst = mem_wb['IR']
 
     try:
@@ -591,10 +587,10 @@ def write_back() -> None:
 def main() -> None:
     global pc
     with open('instructions.txt', 'r', encoding='utf-8') as f:  # TODO: try excpet
-        i = 0
+        inst_i = 0
         for line in f:
-            inst_mem[i] = line.strip()
-            i += 1
+            inst_mem[inst_i] = line.strip()
+            inst_i += 1
 
     pc_write = if_id_write = True
 

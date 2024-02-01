@@ -2,3 +2,4 @@ venv/
 .vscode/
 src/__pycache__/
 src/output.txt
+src/HazardDetection.py
