@@ -4,9 +4,8 @@ _summary_
 
 """
 from termcolor import colored
-from Memory import Memory
 from Register import RegFile
-from Cache import cache, if_in_cache, add_to_cache, get_cache_data
+from Cache import cache, inst_mem, data_mem, if_in_cache, add_to_cache, get_cache_data
 from Alu import ALU
 from BinFuncs import sign_extend, bin_to_int_signed, bin_to_int_unsigned
 from PipelineRegister import PipelineRegister
@@ -123,7 +122,6 @@ bin_to_regname = {
 }
 
 
-inst_mem = Memory(1024)
 reg_file = RegFile()
 
 
@@ -134,7 +132,6 @@ for i in range(32):
 
 alu = ALU()
 
-data_mem = Memory(1024)
 for i in range(1024):
     data_mem[i] = sign_extend(i+1, 32)
 
@@ -202,14 +199,19 @@ def update_id_ex() -> None:
         id_ex['MEM_WRITE'] = '0'
         id_ex['BRANCH'] = '0'
         id_ex['REG_WRITE'] = '1'
-        if opcode in ['lw', 'sw']:
+        if opcode == 'lw':
             id_ex['MEM_TO_REG'] = '1'
             id_ex['ALUT_OP'] = '00'
             id_ex['MEM_READ'] = '1'
+            id_ex['MEM_WRITE'] = '0'
             id_ex['REG_DST'] = '0'
-            if opcode == 'sw':
-                id_ex['MEM_WRITE'] = '1'
-                id_ex['REG_WRITE'] = '0'
+        elif opcode == 'sw':
+            id_ex['ALUT_OP'] = '00'
+            id_ex['MEM_READ'] = '0'
+            id_ex['MEM_WRITE'] = '1'
+            id_ex['REG_DST'] = '0'
+            id_ex['REG_WRITE'] = '0'
+
     elif is_branch(opcode):
         id_ex['REG_DST'] = '0'
         id_ex['ALU_SRC'] = '00'
@@ -518,10 +520,10 @@ def working_with_cache() -> None:
             text = colored('stall', 'red')
             print((text+'\n')*10)
             # no operation for 10 cycles (stall) -> update if_id and id_ex
-            print(alu_out)
+            print('address:', alu_out)
             try:
                 add_to_cache(alu_out,
-                             data_mem[bin_to_int_unsigned(alu_out)])
+                             data_mem[bin_to_int_unsigned(alu_out)], 'mem')
                 # print('data_mem[alu_out]: ',
                 #       data_mem[bin_to_int_unsigned(alu_out)])
                 # we have to get tag and number of set bits to cache to get value:
@@ -533,26 +535,22 @@ def working_with_cache() -> None:
 
                 # print(cache)
             except KeyError:
-                add_to_cache(alu_out, data_mem[alu_out])
+                add_to_cache(alu_out, data_mem[alu_out], 'mem')
             except Exception:
                 raise Exception('alu_out < 0')
         else:
             text = colored('cache hit ✅', 'green')
             print(text)
-        ex_mem['ALU_OUT'] = get_cache_data(cache, alu_out)
+        ex_mem['ALU_OUT'], state = get_cache_data(cache, alu_out)
         print('lw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
-              '(', bin_to_regname[inst[6:11]], ')', 'value: ', ex_mem['ALU_OUT'])
-    elif opcode == 'sw':  # ! Wrong!!!!!!!!!!!!!
-        # check if the block is in cache
-        if not if_in_cache(cache, alu_out):
-            # if not, add it to cache
-            add_to_cache(alu_out, data_mem[alu_out])
+              '(', bin_to_regname[inst[6:11]], ')', 'value: ', ex_mem['ALU_OUT'], state)
+    elif opcode == 'sw':
         # write data to cache and set state to modified
-        cache[alu_out].data = sign_extend(
-            reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val, 32)
-        cache[alu_out].state = 'modified'
+        add_to_cache(alu_out, sign_extend(
+            reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val, 32), 'modified')
         print('sw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
-              '(', bin_to_regname[inst[6:11]], ')', 'val: ', cache[alu_out].data)
+              '(', bin_to_regname[inst[6:11]], ')', 'value: ', reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val)
+
     # elif opcode == 'addi':
     #     print('addi', bin_to_regname[inst[11:16]], bin_to_regname[inst[6:11]],
     #           bin_to_int_signed(inst[16:], 16), '=', ex_mem['ALU_OUT'])
@@ -612,6 +610,9 @@ def write_back() -> None:
         elif mem_wb['MEM_READ'] == '1':
             print('lw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
                   '(', bin_to_regname[inst[6:11]], ')', '=', mem_wb['ALU_OUT'])
+        elif mem_wb['MEM_WRITE'] == '1':
+            print('sw:', '\nin location:', bin_to_int_signed(inst[16:], 16), ', value:',
+                  reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val, ' saved')
         elif opcode == 'jr':
             print('jr', bin_to_regname[inst[6:11]])
         elif opcode == 'jal':
@@ -623,6 +624,7 @@ def write_back() -> None:
 # *********************** main ***********************
 
 def main() -> None:
+    print(cache)
     global pc
     with open('instructions.txt', 'r') as f:  # TODO: try excpet
         i = 0

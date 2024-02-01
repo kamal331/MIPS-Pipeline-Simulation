@@ -1,3 +1,4 @@
+from Memory import Memory
 from BinFuncs import sign_extend, bin_to_int_unsigned
 """
 level one 2-way set-associative MSI cache
@@ -47,7 +48,7 @@ class Cache:
             (block_size).bit_length() + 2
         self.set_bits_size = (self.num_sets).bit_length() - 1
 
-        self.blocks = [[Block('0'*self.tag_size, '0'*block_size)
+        self.blocks = [[Block('0'*self.tag_size, '1'*block_size)
                         for _ in range(num_ways)] for _ in range(self.num_sets)]
 
         self.lru = [0 for _ in range(self.num_sets)]
@@ -82,6 +83,8 @@ class Cache:
 
 
 cache: Cache = Cache(1024, 32, 2)
+inst_mem = Memory(1024)
+data_mem = Memory(1024)
 
 
 def if_in_cache(cache: Cache, address: str) -> bool:
@@ -91,34 +94,54 @@ def if_in_cache(cache: Cache, address: str) -> bool:
     set_bits = address[tag_size:tag_size+set_bit_size]
     # offset_bits = address[tag_size+set_bit_size:]
     # check if the block is in cache
-    if cache[tag_bits + set_bits] and cache[tag_bits + set_bits].state != 'invalid':
+    if cache[tag_bits + set_bits].state != 'invalid':
         return True
     return False
 
 
-def add_to_cache(address: str, data: str) -> None:
+def add_to_cache(address: str, data: str, from_where: str) -> None:
+    """
+    add data of an address to the cache.
+    if from_where == 'mem': state = shared
+    else: # from register:
+        if cache[tag_bits + set_bits].state == 'modified': write back to memory first and then add the new data to cache
+        else: add the new data to cache
+
+    """
     global cache
     tag_size = cache.tag_size
     set_bit_size = cache.set_bits_size
     tag_bits = address[:tag_size]
     set_bits = address[tag_size:tag_size+set_bit_size]
-    # offset_bits = address[tag_size+set_bit_size:]
-    # if not, add it to cache
-    block = Block(tag_bits, data)
-    block.state = 'shared'
-    cache[tag_bits + set_bits] = block
+    offset_bits = address[tag_size+set_bit_size:]
+    # check if the block is in cache
+    if if_in_cache(cache, address):
+        if cache[tag_bits + set_bits].state == 'modified':
+            # write back to memory
+            # mem_address = cache[tag_bits + set_bits].tag + set_bits + '0'*5
+            data_mem[address] = cache[tag_bits + set_bits].data
+            print(
+                f'write back to memory: {address} -> {cache[tag_bits + set_bits].data}')
+        # add the new data to cache
+        cache[tag_bits + set_bits] = Block(tag_bits, data)
+        cache[tag_bits + set_bits].state = 'shared' if from_where == 'mem' else 'modified'
+    else:
+        # add the new data to cache
+        cache[tag_bits + set_bits] = Block(tag_bits, data)
+        cache[tag_bits + set_bits].state = 'shared' if from_where == 'mem' else 'modified'
 
 
-def get_cache_data(cache: Cache, address: str) -> str:
+def get_cache_data(cache: Cache, address: str) -> tuple[str, str]:
     tag_size = cache.tag_size
     set_bit_size = cache.set_bits_size
     tag_bits = address[:tag_size]
     set_bits = address[tag_size:tag_size+set_bit_size]
     # offset_bits = address[tag_size+set_bit_size:]
     # check if the block is in cache
-    if cache[tag_bits + set_bits] and cache[tag_bits + set_bits].state != 'invalid':
-        return cache[tag_bits + set_bits][:]
-    return '0'*cache.block_size
+    # cache[tag_bits + set_bits] and cache[tag_bits + set_bits].state != 'invalid'
+    if if_in_cache(cache, address):
+        return cache[tag_bits + set_bits][:], cache[tag_bits + set_bits].state
+    return '0'*cache.block_size, 'invalid'
 
 
 # * =========== test ===========
