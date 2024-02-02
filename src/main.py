@@ -176,7 +176,6 @@ def hazard_detection(instr: str):
 
 
 def update_if_id() -> None:
-    global if_id
     if_id['PC'] = sign_extend(pc, 32)
     # get instruction from memory
     inst = inst_mem[pc]
@@ -191,7 +190,6 @@ def update_if_id() -> None:
 
 
 def update_id_ex() -> None:
-    global id_ex
     inst = if_id['IR']
     # update id_ex
     id_ex['IR'] = inst
@@ -261,7 +259,6 @@ def update_id_ex() -> None:
 
 
 def update_ex_mem() -> None:
-    global ex_mem
     # get instruction from id_ex
     inst = id_ex['IR']
     # update ex_mem
@@ -286,7 +283,6 @@ def update_ex_mem() -> None:
 
 
 def update_mem_wb() -> None:
-    global mem_wb
     # get instruction from ex_mem
     inst = ex_mem['IR']
     # update mem_wb
@@ -314,7 +310,6 @@ def update_mem_wb() -> None:
 # ************************** Fetch **************************
 
 def fetch() -> None:
-    global if_id
     # get instruction from memory
     inst = inst_mem[pc]
     text = colored('instruction fetched: ✅', 'yellow')
@@ -369,7 +364,7 @@ def decode() -> None:
 # ************************** Execute **************************
 
 def ex_rtype(inst: str, opcode: str) -> None:
-    global alu_inp1, alu_inp2, alu_out, zero_flag
+    global alu_inp1, alu_inp2, alu_out
 
     # binary should be passed to alu
     if type(reg_file[f'${bin_to_int_unsigned(inst[6:11])}'].val) is int:
@@ -428,7 +423,7 @@ def ex_rtype(inst: str, opcode: str) -> None:
 
 
 def ex_itype(inst: str, opcode: str) -> None:
-    global alu_inp1, alu_inp2, alu_out, zero_flag
+    global alu_inp1, alu_inp2, alu_out
     if type(reg_file[f'${bin_to_int_unsigned(inst[6:11])}'].val) is int:
         alu_inp1 = sign_extend(
             reg_file[f'${bin_to_int_unsigned(inst[6:11])}'].val, 32)
@@ -476,7 +471,6 @@ def ex_itype(inst: str, opcode: str) -> None:
 
 
 def execute() -> None:
-    global ex_mem
     inst = id_ex['IR']
 
     try:
@@ -504,8 +498,6 @@ def execute() -> None:
 # ************************** Memory **************************
 
 def working_with_cache() -> None:
-
-    global ex_mem
     inst = ex_mem['IR']
     try:
         opcode = bin_to_inst_dict[(ex_mem['OPCODE'], ex_mem['FUNCT'])]
