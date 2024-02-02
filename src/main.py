@@ -624,7 +624,7 @@ def write_back() -> None:
 # *********************** main ***********************
 
 
-def license() -> None:
+def _license() -> None:
     print(colored('''
     MIT License
     -----------
@@ -648,7 +648,7 @@ def license() -> None:
     input('Enter any key to back to menu: ')
 
 
-def simulate() -> None:
+def _simulate() -> None:
     global pc  # skipcq: PYL-W0603
     try:
         with open('instructions.txt', 'r', encoding='utf-8') as f:
@@ -719,9 +719,9 @@ def main() -> None:
             print(f'{ASK_TEXT}\n{CHOICE1}\n{CHOICE2}\n{CHOICE3}')
             choice = input()
         if choice == '1':
-            simulate()
+            _simulate()
         elif choice == '2':
-            license()
+            _license()
         else:
             sys.exit()
         print(CLEAR_TERMINAL)

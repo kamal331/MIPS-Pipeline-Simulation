@@ -80,7 +80,7 @@ class ALU:
         return sign_extend(bin_to_int_signed(a, 32) >> n, 32)
 
     @staticmethod
-    def mult(m: str, q: str, bits_no=16) -> str:
+    def mult(m: str, q: str, bits_no=16) -> str:  # skipcq: PYL-W0621
         """_summary_
 
         Args:

@@ -53,10 +53,8 @@ class Cache:
              for _j in range(associativity)] for _ in range(self.sets_no)
         ]
 
-    def __setitem__(self,
-                    address: str,
-                    val: str,
-                    from_where: str = 'cpu') -> None:  # skipcq: PYL-W0621
+    # skipcq: PYL-W0621
+    def __setitem__(self, address: str, val: str, from_where: str = 'cpu') -> None:
         tag = address[:self.tag_bits_no]
         block_offset = int(
             address[self.tag_bits_no+self.logic_set_bits_no:], 2)
