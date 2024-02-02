@@ -135,8 +135,8 @@ alu_inp1 = alu_inp2 = alu_out = zero_flag = pc = stall_count = 0
 
 # ************************** Helper Functions **************************
 
-def hazard_detection(instr: str):
-    global alu_inp1, alu_inp2
+def hazard_detection(instr: str) -> None:
+    global alu_inp1, alu_inp2  # skipcq: PYL-W0603
 
     # ------- for raw hazard of r-type instructions -------
     # ex hazard:
@@ -364,7 +364,7 @@ def decode() -> None:
 # ************************** Execute **************************
 
 def ex_rtype(inst: str, opcode: str) -> None:
-    global alu_inp1, alu_inp2, alu_out
+    global alu_inp1, alu_inp2, alu_out  # skipcq: PYL-W0603
 
     # binary should be passed to alu
     if type(reg_file[f'${bin_to_int_unsigned(inst[6:11])}'].val) is int:
@@ -423,7 +423,7 @@ def ex_rtype(inst: str, opcode: str) -> None:
 
 
 def ex_itype(inst: str, opcode: str) -> None:
-    global alu_inp1, alu_inp2, alu_out
+    global alu_inp1, alu_inp2, alu_out  # skipcq: PYL-W0603
     if type(reg_file[f'${bin_to_int_unsigned(inst[6:11])}'].val) is int:
         alu_inp1 = sign_extend(
             reg_file[f'${bin_to_int_unsigned(inst[6:11])}'].val, 32)
