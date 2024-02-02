@@ -79,8 +79,39 @@ class ALU:
         """
         return sign_extend(bin_to_int_signed(a, 32) >> n, 32)
 
+    @staticmethod
+    def mult(m: str, q: str, bits_no=16) -> str:
+        """_summary_
+
+        Args:
+            a (str): 32-bit binary string
+            b (str): 32-bit binary string
+
+        Returns:
+            str: a * b using booth algorithm
+        """
+        # booth algorithm for multiplication of two signed 32-bit numbers
+        # 1. initialize the product and the multiplicand
+        a = '0' * bits_no
+        q_minus = '0'
+        for _ in range(bits_no):
+            # 2. check the last 2 bits of q and q_minus
+            if q[-1] == '1' and q_minus == '0':
+                a = (ALU.sub(a, m))[-bits_no:]
+            elif q[-1] == '0' and q_minus == '1':
+                a = (ALU.add(a, m))[-bits_no:]
+            # 3. shift right a and q
+            a_copy = q[-1] + a[:-1]
+            q_minus = q[-1]
+            q = a[-1] + q[:-1]
+            a = a_copy
+
+        return (a + q)[-bits_no * 2:]
+
 
 # * =========== test ===========
 if __name__ == '__main__':
     alu = ALU()
-    print(alu.add('0'*32, '1'*32))
+    m = '0111'
+    q = '0011'
+    print(alu.mult(m, q, 4))  # 21 => 010101

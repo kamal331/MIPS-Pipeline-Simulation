@@ -22,9 +22,10 @@ id_ex = PipelineRegister('id_ex', {'PC': '0'*32, 'RD': '0'*5, 'RT': '0'*5,
                                    'FUNCT': '0'*6, 'OPCODE': '0'*6,
                                    'IR': '0'*32, 'REG_DST': '0',
                                    'ALU_SRC': '0'*2, 'MEM_TO_REG': '0',
-                                   'ALUT_OP': '0'*2, 'MEM_READ': '0',
+                                   'ZERO': '0', 'ALUT_OP': '0'*2,
+                                   'MEM_READ': '0',
                                    'MEM_WRITE': '0', 'BRANCH': '0',
-                                   'REG_WRITE': '0'})  # TODO: early branch detection
+                                   'REG_WRITE': '0'})
 
 ex_mem = PipelineRegister('ex_mem', {'PC': '0'*32, 'RD': '0'*5, 'RT': '0'*5,
                                      'RS': '0'*5, 'SHAMT': '0'*5,
@@ -36,7 +37,7 @@ ex_mem = PipelineRegister('ex_mem', {'PC': '0'*32, 'RD': '0'*5, 'RT': '0'*5,
                                      'REG_WRITE': '0', 'ALU_OUT': '0'*32,
                                      'ZERO': '0',
                                      'RDVAL': '0'*32,
-                                     'RSVAL': '0'*32, 'RTVAL': '0'*32})  # TODO: early branch detection
+                                     'RSVAL': '0'*32, 'RTVAL': '0'*32})
 # 'ALU_IN2': '0'*32, 'ALU_IN1': '0'*32, 'MEM_READ_DATA': '0'*32
 
 mem_wb = PipelineRegister('mem_wb', {'PC': '0'*32, 'RD': '0'*5, 'RT': '0'*5,
@@ -49,7 +50,7 @@ mem_wb = PipelineRegister('mem_wb', {'PC': '0'*32, 'RD': '0'*5, 'RT': '0'*5,
                                      'REG_WRITE': '0', 'ALU_OUT': '0'*32,
                                      'ZERO': '0',
                                      'RDVAL': '0'*32,
-                                     'RSVAL': '0'*32, 'RTVAL': '0'*32})  # TODO: early branch detection
+                                     'RSVAL': '0'*32, 'RTVAL': '0'*32})
 
 
 # tuple(opcode, funct): instruction
@@ -72,11 +73,6 @@ bin_to_inst_dict = {
     ('000000', '011001'): 'multu',
     ('000000', '011010'): 'div',
     ('000000', '011011'): 'divu',
-    ('000000', '010001'): 'mthi',
-    ('000000', '010011'): 'mtlo',
-    ('000000', '100001'): 'movn',
-    ('000000', '100011'): 'movz',
-    ('000000', '101011'): 'sltu',
     ('000000', '101000'): 'addu',
     ('000000', '101001'): 'addiu',
     ('000000', '001111'): 'jal',
@@ -129,16 +125,11 @@ bin_to_regname = {
 
 
 reg_file = RegFile()
-
-
 # initialize reg_file:
 for i in range(32):
     reg_file[f'${i}'] = 0
 
-
 alu = ALU()
-
-
 alu_inp1 = alu_inp2 = alu_out = zero_flag = pc = stall_count = 0
 
 
@@ -326,8 +317,6 @@ def fetch() -> None:
     global if_id
     # get instruction from memory
     inst = inst_mem[pc]
-    # ! No need to write to if_id
-
     text = colored('instruction fetched: ✅', 'yellow')
     print(text)
     print(inst)
@@ -335,7 +324,7 @@ def fetch() -> None:
 
 def is_rtype(name: str) -> bool:
     return name in ['add', 'sub', 'and', 'or', 'xor', 'nor', 'slt', 'sll',
-                    'srl', 'jr', 'syscall', 'break', 'mfhi', 'mflo', 'mult',
+                    'srl', 'jr', 'syscall', 'break', 'mult',
                     'multu', 'div', 'divu', 'mthi', 'mtlo', 'movn', 'movz',
                     'sltu', 'addu']
 
@@ -422,6 +411,9 @@ def ex_rtype(inst: str, opcode: str) -> None:
     elif opcode == 'nor':
         alu_out = alu.nor(alu_inp1, alu_inp2)
         print('nor', rd, rs, rt)
+    elif opcode == 'mult':
+        alu_out = alu.mult(alu_inp1, alu_inp2)
+        print('mult', rs, rt)
 
     elif opcode == 'sll':
         alu_out = alu.sll(alu_inp1, bin_to_int_unsigned(inst[21:26]))
@@ -471,6 +463,15 @@ def ex_itype(inst: str, opcode: str) -> None:
         alu_out = alu.add(alu_inp1, alu_inp2)
         print('sw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
               '(', bin_to_regname[inst[6:11]], ')', 'address =>', alu_out)
+    elif opcode == 'beq':
+        if alu_inp1 == alu_inp2:
+            id_ex['BRANCH'] = '1'
+            print('beq', bin_to_regname[inst[6:11]], bin_to_regname[inst[11:16]],
+                  bin_to_int_signed(inst[16:], 16), '=> branch taken')
+        else:
+            id_ex['BRANCH'] = '0'
+            print('beq', bin_to_regname[inst[6:11]], bin_to_regname[inst[11:16]],
+                  bin_to_int_signed(inst[16:], 16), '=> branch not taken')
     ex_mem['RDVAL'] = alu_out
 
 
@@ -518,39 +519,6 @@ def working_with_cache() -> None:
         print('lw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
               '(', bin_to_regname[inst[6:11]], ')', 'value: ', ex_mem['ALU_OUT'])
 
-        # check if the block is in cache
-        # if not if_in_cache(cache, alu_out):
-        #     print('@'*15, '\n\n\n\n\n')
-        #     # if not, add it to cache
-        #     text = colored('cache miss ❌', 'red')
-        #     print(text)
-        #     text = colored('stall', 'red')
-        #     print((text+'\n')*10)
-        #     # no operation for 10 cycles (stall) -> update if_id and id_ex
-        #     print('address:', alu_out)
-        #     try:
-        #         add_to_cache(alu_out,
-        #                      data_mem[bin_to_int_unsigned(alu_out)], 'mem')
-        #         # print('data_mem[alu_out]: ',
-        #         #       data_mem[bin_to_int_unsigned(alu_out)])
-        #         # we have to get tag and number of set bits to cache to get value:
-        #         # tag_bits = alu_out[:cache.tag_size]
-        #         # set_bits = alu_out[cache.tag_size:cache.tag_size +
-        #         #                    cache.set_bits_size]
-
-        #         # print('cache[alu_out].data: ', cache[tag_bits + set_bits].data)
-
-        #         # print(cache)
-        #     except KeyError:
-        #         add_to_cache(alu_out, data_mem[alu_out], 'mem')
-        #     except Exception:
-        #         raise Exception('alu_out < 0')
-        # else:
-        #     text = colored('cache hit ✅', 'green')
-        #     print(text)
-        # ex_mem['ALU_OUT'], state = get_cache_data(cache, alu_out)
-        # print('lw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
-        #       '(', bin_to_regname[inst[6:11]], ')', 'value: ', ex_mem['ALU_OUT'], state)
     elif opcode == 'sw':
         data_cache[alu_out] = sign_extend(
             reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val, 32)
@@ -558,12 +526,6 @@ def working_with_cache() -> None:
             reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val, 32)
         print('sw:', '\nin location:', bin_to_int_signed(inst[16:], 16), ', value:',
               reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val, 'must be saved')
-        # write data to cache and set state to modified
-        # add_to_cache(alu_out, sign_extend(
-        #     reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val, 32), 'modified')
-        # print('sw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
-        #       '(', bin_to_regname[inst[6:11]], ')', 'value: ',
-        #          reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val)
 
     else:
         print('no cache needed for this instruction 🙄')
@@ -619,17 +581,23 @@ def write_back() -> None:
 
 def main() -> None:
     global pc  # skipcq: PYL-W0603
-    with open('instructions.txt', 'r', encoding='utf-8') as f:  # TODO: try excpet
-        inst_i = 0
-        for line in f:
-            inst_mem[inst_i] = line.strip()
-            inst_i += 1
+    try:
+        with open('instructions.txt', 'r', encoding='utf-8') as f:
+            inst_i = 0
+            for line in f:
+                inst_mem[inst_i] = line.strip()
+                inst_i += 1
+    except FileNotFoundError:
+        print('file not found')
+        return
+    except Exception as _:
+        print('something went wrong')
 
     pc_write = if_id_write = True
 
     inst_count = inst_i + 1
     pipeline_stage_no = 5
-    total_pipeline_clocks = inst_count + pipeline_stage_no - 1  # ! except for hazards
+    total_pipeline_clocks = inst_count + pipeline_stage_no - 1
     cycle_seperator = colored('==================', 'magenta')
     stage_seperator = colored('------------------', 'green')
     k = 0

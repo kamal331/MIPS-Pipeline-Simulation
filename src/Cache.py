@@ -57,19 +57,6 @@ class Cache:
                     address: str,
                     val: str,
                     from_where: str = 'cpu') -> None:  # skipcq: PYL-W0621
-        """
-        if the block we want to write to is modified, first write the
-          value in the block to memory (for all blocks in the line if 
-          the block is modified)
-        then write the value we want to cache
-        after insuring that the modified block is written to memory, write
-          the value to the block
-        if from_where is 'mem', then we will bring a line from memory to cache
-          (it means that for all blocks_in_line we will bring the corresponding 
-          data from memory to cache) and state will be 'shared'
-        if from_where is 'cpu', then we will write that block to cache and
-          state will be 'modified'
-        """
         tag = address[:self.tag_bits_no]
         block_offset = int(
             address[self.tag_bits_no+self.logic_set_bits_no:], 2)
@@ -94,22 +81,7 @@ class Cache:
                 self.blocks[logic_set][lru][i].tag = tag
                 self.blocks[logic_set][lru][i].state = 'shared'
             self.lru[logic_set] = 1 - self.lru[logic_set]
-            # first we have to write the modified blocks to memory:
-            # for i in range(self.blocks_in_line):
-            #     if self.blocks[logic_set][0][i].state == 'modified':
-            #         self.mem[bin_to_int_unsigned(self.blocks[logic_set][0][i].tag + f'{logic_set:0{self.logic_set_bits_no}b}' +
-            #                  f'{i:0{self.block_offset_bits_no}b}')] = self.blocks[logic_set][0][i].data
-            # for i in range(self.blocks_in_line):
-            #     self.blocks[logic_set][0][i].data = self.mem[bin_to_int_unsigned(
-            #         address[:self.tag_bits_no] + f'{logic_set:0{self.logic_set_bits_no}b}' + f'{i:0{self.block_offset_bits_no}b}')]
-            # self.blocks[logic_set][0][i].tag = tag
-            # self.blocks[logic_set][0][i].state = 'shared'
-
         else:
-            # for i in range(self.associativity):
-            #     if self.blocks[logic_set][i][block_offset].state == 'modified':
-            #         self.mem[self.blocks[logic_set][i][block_offset].tag + f'{logic_set:0{self.logic_set_bits_no}b}' +
-            #                  f'{block_offset:0{self.block_offset_bits_no}b}'] = self.blocks[logic_set][i][block_offset].data
             self.blocks[logic_set][self.lru[logic_set]
                                    ][block_offset].data = val
             self.blocks[logic_set][self.lru[logic_set]][block_offset].tag = tag
@@ -137,7 +109,6 @@ class Cache:
                     print(
                         f'hit, tag: {tag}, logic_set: {logic_set}, block_offset: {block_offset}')
                     return self.blocks[logic_set][i][block_offset].data
-        # if we are here, then the block is not in the cache and we have to bring it from memory
         print('Cache miss ❌')
         self.__setitem__(
             address, self.mem[bin_to_int_unsigned(address)], 'mem')
@@ -153,10 +124,10 @@ class Cache:
                 for k in range(self.blocks_in_line):
                     res += f'{self.blocks[i][j][k]}\n'
         return res
-    
+
     def __repr__(self) -> str:
         return self.__str__()
-    
+
     def __len__(self) -> int:
         return self.sets_no
 
