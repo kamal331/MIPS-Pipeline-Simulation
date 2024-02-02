@@ -585,7 +585,7 @@ def write_back() -> None:
 # *********************** main ***********************
 
 def main() -> None:
-    global pc
+    global pc  # skipcq: PYL-W0603
     with open('instructions.txt', 'r', encoding='utf-8') as f:  # TODO: try excpet
         inst_i = 0
         for line in f:
@@ -594,7 +594,7 @@ def main() -> None:
 
     pc_write = if_id_write = True
 
-    inst_count = 9
+    inst_count = inst_i + 1
     pipeline_stage_no = 5
     total_pipeline_clocks = inst_count + pipeline_stage_no - 1  # ! except for hazards
     cycle_seperator = colored('==================', 'magenta')

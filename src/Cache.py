@@ -56,7 +56,7 @@ class Cache:
     def __setitem__(self,
                     address: str,
                     val: str,
-                    from_where: str = 'cpu') -> None:  # PYL-W0621
+                    from_where: str = 'cpu') -> None:  # skipcq: PYL-W0621
         """
         if the block we want to write to is modified, first write the
           value in the block to memory (for all blocks in the line if 
@@ -155,7 +155,7 @@ class Cache:
         return res
 
 
-def get_state_of_block(cache: Cache, address: str) -> str:  # PYL-W0621
+def get_state_of_block(cache: Cache, address: str) -> str:  # skipcq: PYL-W0621
     tag = address[:cache.tag_bits_no]
     block_offset = int(address[cache.tag_bits_no+cache.logic_set_bits_no:], 2)
     logic_set = int(
