@@ -81,6 +81,6 @@ class ALU:
 
 
 # * =========== test ===========
-# alu: ALU = ALU()
-# print(alu.add(sign_extend(-1), sign_extend(1)))
-# print(alu.sub(sign_extend(-1), sign_extend(1)))
+if __name__ == '__main__':
+    alu = ALU()
+    print(alu.add('0'*32, '1'*32))

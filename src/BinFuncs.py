@@ -20,3 +20,11 @@ def bin_to_int_signed(val: str, bits_no: int) -> int:
 
 def bin_to_int_unsigned(val: str) -> int:
     return int(val, 2)
+
+
+# * =========== test ===========
+if __name__ == '__main__':
+    print(sign_extend(1, 32))
+    print(sign_extend(-1, 32))
+    print(sign_extend(2**33, 32))
+    print(bin_to_int_signed('1'*32, 32))

@@ -5,5 +5,6 @@ addi $14 $0 0x3   // $14 = 3  -> addi t6 $zero 0x3
 addi $15 $0 0x4   // $15 = 4  -> addi t7 $zero 0x4
 addi $15 $0 0x4   // $15 = 8  -> addi t7 $zero 0x4
 add $8 $8 $9      // $8 = 3 -> add t0 t0 t1
+add $8 $8 $9      // $8 = 4 -> add t0 t0 t1
 lw $20 0x01 $zero // lw s4 0x01 $zero
 sw $zero 0x5 $zero // or 0x4000

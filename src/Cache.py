@@ -153,6 +153,12 @@ class Cache:
                 for k in range(self.blocks_in_line):
                     res += f'{self.blocks[i][j][k]}\n'
         return res
+    
+    def __repr__(self) -> str:
+        return self.__str__()
+    
+    def __len__(self) -> int:
+        return self.sets_no
 
 
 def get_state_of_block(cache: Cache, address: str) -> str:  # skipcq: PYL-W0621

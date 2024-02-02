@@ -11,6 +11,8 @@ from BinFuncs import sign_extend, bin_to_int_signed, bin_to_int_unsigned
 from PipelineRegister import PipelineRegister
 
 
+# ************************** Pre-Defined Variables **************************
+
 if_id = PipelineRegister('if_id', {'PC': '0'*5, 'RD': '0'*5, 'RT': '0'*5,
                          'RS': '0'*5, 'SHAMT': '0'*5, 'FUNCT': '0'*6,
                                    'OPCODE': '0'*6, 'IR': '0'*32})
@@ -32,7 +34,9 @@ ex_mem = PipelineRegister('ex_mem', {'PC': '0'*32, 'RD': '0'*5, 'RT': '0'*5,
                                      'ALUT_OP': '0'*2, 'MEM_READ': '0',
                                      'MEM_WRITE': '0', 'BRANCH': '0',
                                      'REG_WRITE': '0', 'ALU_OUT': '0'*32,
-                                     'ZERO': '0'})
+                                     'ZERO': '0',
+                                     'RDVAL': '0'*32,
+                                     'RSVAL': '0'*32, 'RTVAL': '0'*32})  # TODO: early branch detection
 # 'ALU_IN2': '0'*32, 'ALU_IN1': '0'*32, 'MEM_READ_DATA': '0'*32
 
 mem_wb = PipelineRegister('mem_wb', {'PC': '0'*32, 'RD': '0'*5, 'RT': '0'*5,
@@ -43,7 +47,9 @@ mem_wb = PipelineRegister('mem_wb', {'PC': '0'*32, 'RD': '0'*5, 'RT': '0'*5,
                                      'ALUT_OP': '0'*2, 'MEM_READ': '0',
                                      'MEM_WRITE': '0', 'BRANCH': '0',
                                      'REG_WRITE': '0', 'ALU_OUT': '0'*32,
-                                     'ZERO': '0'})
+                                     'ZERO': '0',
+                                     'RDVAL': '0'*32,
+                                     'RSVAL': '0'*32, 'RTVAL': '0'*32})  # TODO: early branch detection
 
 
 # tuple(opcode, funct): instruction
@@ -134,6 +140,48 @@ alu = ALU()
 
 
 alu_inp1 = alu_inp2 = alu_out = zero_flag = pc = stall_count = 0
+
+
+# ************************** Helper Functions **************************
+
+def hazard_detection(instr: str):
+    global alu_inp1, alu_inp2
+
+    # ------- for raw hazard of r-type instructions -------
+    # ex hazard:
+    if ex_mem['REG_WRITE'] and ex_mem['RD'] != '00000' and ex_mem['RD'] == instr[6:11]:
+        alu_inp1 = ex_mem['RDVAL']
+
+    # mem hazard:
+    elif mem_wb['REG_WRITE'] and mem_wb['RD'] != '00000' and mem_wb['RD'] == instr[6:11]:
+        alu_inp1 = mem_wb['RDVAL']
+
+    # ex hazard:
+    if ex_mem['REG_WRITE'] and ex_mem['RD'] != '00000' and ex_mem['RD'] == instr[11:16]:
+        alu_inp2 = ex_mem['RDVAL']
+
+    # mem hazard:
+    elif mem_wb['REG_WRITE'] and mem_wb['RD'] != '00000' and mem_wb['RD'] == instr[11:16]:
+        alu_inp2 = mem_wb['RDVAL']
+    # ------- for raw hazard of load-use data hazard -------
+        # if id_ex['MEMREAD'] and id_ex['RT'] != '00000' and (id_ex['RT'] == instr[6:11] or id_ex['RT'] == instr[11:16]):
+        #    # stall -> force control signals to 0. ex, mem, wb do no operation.
+        #      and prevent update of pc and if/id register (instruction will decode again)
+        #     id_ex['REGWRITE'] = 0
+        #     id_ex['MEMTOREG'] = 0
+        #     id_ex['MEMREAD'] = 0
+        #     id_ex['MEMWRITE'] = 0
+        #     id_ex['ALUOP'] = '00'  # no operation
+        #     id_ex['ALUSRC'] = 0
+        #     id_ex['PCWRITE'] = 0
+        #     id_ex['PCSRC'] = '00'  # no operation
+        #     id_ex['IFIDWRITE'] = 0
+        #     id_ex['PC'] = id_ex['PC'] - 4  # pc will not update
+        #     if_id['PC'] = if_id['PC'] - 4
+        #     print('---- stall ----')
+        #     return True
+
+        # # ------- branch hazard -------
 
 
 def update_if_id() -> None:
@@ -235,14 +283,6 @@ def update_ex_mem() -> None:
     ex_mem['FUNCT'] = inst[26:32]
     ex_mem['PC'] = id_ex['PC']
 
-    # control signals
-    # execute instruction
-    # try:
-    #     opcode = bin_to_inst_dict[(id_ex['OPCODE'], id_ex['FUNCT'])]
-    # except KeyError:
-    #     opcode = bin_to_inst_dict[(id_ex['OPCODE'], 'xxxxxx')]
-
-    # get needed control signals from id_ex TODO: some signals are not needed and can be removed
     ex_mem['REG_DST'] = id_ex['REG_DST']
     ex_mem['ALU_SRC'] = id_ex['ALU_SRC']
     ex_mem['MEM_TO_REG'] = id_ex['MEM_TO_REG']
@@ -268,14 +308,6 @@ def update_mem_wb() -> None:
     mem_wb['FUNCT'] = inst[26:32]
     mem_wb['PC'] = ex_mem['PC']
 
-    # control signals
-    # execute instruction
-    # try:
-    #     opcode = bin_to_inst_dict[(mem_wb['OPCODE'], mem_wb['FUNCT'])]
-    # except KeyError:
-    #     opcode = bin_to_inst_dict[(mem_wb['OPCODE'], 'xxxxxx')]
-
-    # get needed control signals from ex_mem TODO: some signals are not needed and can be removed
     mem_wb['REG_DST'] = ex_mem['REG_DST']
     mem_wb['ALU_SRC'] = ex_mem['ALU_SRC']
     mem_wb['MEM_TO_REG'] = ex_mem['MEM_TO_REG']
@@ -285,20 +317,17 @@ def update_mem_wb() -> None:
     mem_wb['BRANCH'] = ex_mem['BRANCH']
     mem_wb['REG_WRITE'] = ex_mem['REG_WRITE']
     mem_wb['ALU_OUT'] = ex_mem['ALU_OUT']
+    mem_wb['RDVAL'] = ex_mem['RDVAL']
 
+
+# ************************** Fetch **************************
 
 def fetch() -> None:
     global if_id
     # get instruction from memory
     inst = inst_mem[pc]
     # ! No need to write to if_id
-    # if_id['IR'] = inst
-    # if_id['OPCODE'] = inst[:6]
-    # if_id['RS'] = inst[6:11]
-    # if_id['RT'] = inst[11:16]
-    # if_id['RD'] = inst[16:21]
-    # if_id['SHAMT'] = inst[21:26]
-    # if_id['FUNCT'] = inst[26:32]
+
     text = colored('instruction fetched: ✅', 'yellow')
     print(text)
     print(inst)
@@ -343,14 +372,12 @@ def print_decoded_inst() -> None:
               sign_extend(bin_to_int_signed(if_id['IR'][16:], 16), 16))
 
 
-def decode():
-    # get instruction from if_id
-
-    # print instruction type:
+# ************************** Decode **************************
+def decode() -> None:
     print_decoded_inst()
 
 
-# -----------
+# ************************** Execute **************************
 
 def ex_rtype(inst: str, opcode: str) -> None:
     global alu_inp1, alu_inp2, alu_out, zero_flag
@@ -366,6 +393,8 @@ def ex_rtype(inst: str, opcode: str) -> None:
     if type(reg_file[f'${bin_to_int_unsigned(inst[6:11])}'].val) is str:
         alu_inp1 = reg_file[f'${bin_to_int_unsigned(inst[6:11])}'].val
         alu_inp2 = reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val
+
+    hazard_detection(inst)
 
     rd = bin_to_regname[inst[16:21]]
     rs = bin_to_regname[inst[6:11]]
@@ -403,6 +432,7 @@ def ex_rtype(inst: str, opcode: str) -> None:
         alu_out = alu.srl(alu_inp1, bin_to_int_unsigned(inst[21:26]))
         print('srl', rd, bin_to_regname[inst[11:16]],
               bin_to_int_unsigned(inst[21:26]))
+    ex_mem['RDVAL'] = alu_out
 
 
 def ex_itype(inst: str, opcode: str) -> None:
@@ -441,6 +471,7 @@ def ex_itype(inst: str, opcode: str) -> None:
         alu_out = alu.add(alu_inp1, alu_inp2)
         print('sw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
               '(', bin_to_regname[inst[6:11]], ')', 'address =>', alu_out)
+    ex_mem['RDVAL'] = alu_out
 
 
 def execute() -> None:
@@ -468,6 +499,8 @@ def execute() -> None:
         # branch(opcode)
         pass
 
+
+# ************************** Memory **************************
 
 def working_with_cache() -> None:
 
@@ -536,6 +569,8 @@ def working_with_cache() -> None:
         print('no cache needed for this instruction 🙄')
 
 
+# ************************** Write Back **************************
+
 def write_back() -> None:
     inst = mem_wb['IR']
 
@@ -552,8 +587,6 @@ def write_back() -> None:
 
     else:
         print(text, opcode)
-
-        # if instruction is lw, write data to register
         if mem_wb['MEM_TO_REG'] == '1':
             reg_file[f'${bin_to_int_unsigned(inst[11:16])}'].val = mem_wb['ALU_OUT']
             print('lw', bin_to_regname[inst[11:16]], bin_to_int_signed(inst[16:], 16),
@@ -601,10 +634,7 @@ def main() -> None:
     stage_seperator = colored('------------------', 'green')
     k = 0
     while k < total_pipeline_clocks:
-        # first fetch instruction from memory (from file)
-        # pipeline fetch, decode, execute memory, write back
         if pc_write and if_id_write:
-            # fetch instruction from memory
             fetch()
             print(stage_seperator)
 
@@ -618,7 +648,10 @@ def main() -> None:
             print(stage_seperator)
 
             write_back()
-            # print('\n', data_cache, '\n')  # TODO: remove comment
+            # write data cache to file:
+            with open('data_cache.txt', 'a', encoding='utf-8') as f:
+                f.write(str(data_cache))
+                f.write('\n')
 
         print('\n\t', cycle_seperator, '\n')
         update_mem_wb()

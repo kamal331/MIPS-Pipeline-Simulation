@@ -35,9 +35,10 @@ class Memory:
 
 
 # * =========== test ===========
-# mem: Memory = Memory(100)
-# mem[0] = 1
-# mem[1] = 2
-# mem[2] = 3
+if __name__ == '__main__':
+    mem: Memory = Memory(100)
+    mem[0] = '1'*32
+    mem[1] = '01'*16
+    mem[2] = '10'*16
 
-# print(mem)
+    print(mem)
