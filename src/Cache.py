@@ -91,8 +91,10 @@ class Cache:
 
     def __getitem__(self, address: str) -> str:  # skipcq: PYL-W0621
         """
-        if the block we want to read from is invalid, then we will bring the block from memory to cache and state will be 'shared'
-        if the block we want to read from is shared or modified, then we will read the value from the block
+        if the block we want to read from is invalid, then we will
+          bring the block from memory to cache and state will be 'shared'
+        if the block we want to read from is shared or modified,
+          then we will read the value from the block
         """
         tag = address[:self.tag_bits_no]
 
